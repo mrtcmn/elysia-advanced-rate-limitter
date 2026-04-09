@@ -43,7 +43,7 @@ Three algorithms. All O(1) time and space per request.
 
 ### Fixed Window
 
-Simplest option. Divides time into intervals, counts requests per interval.
+Simplest option. Divides time into equal blocks, counts requests per block. Counter resets at each boundary.
 
 ```typescript
 rateLimiter({
@@ -51,7 +51,36 @@ rateLimiter({
 });
 ```
 
-Clients can burst at window boundaries (up to 2x limit in a short span). If that matters, use sliding window.
+```
+limit = 5 requests per window
+
+Window 1 (00:00-01:00)          Window 2 (01:00-02:00)
+┌──────────────────────┐        ┌──────────────────────┐
+│ ## ## ## ## ## .. .. │        │ ## ## ## .. .. .. .. │
+│  1  2  3  4  5  x  x │        │  1  2  3             │
+└──────────────────────┘        └──────────────────────┘
+count=5 -> DENY after 5          count resets to 0
+
+## = allowed    .. = denied    x = rejected
+```
+
+**The boundary burst problem** -- clients can send `limit` requests at the end of one window and `limit` at the start of the next, getting 2x the limit in a short span:
+
+```
+limit = 5
+
+Window 1                        Window 2
+┌──────────────────────┐        ┌──────────────────────┐
+│              ## ## ## │## ## ##│## ##                 │
+│               3  4  5 │ 1  2  3│ 4  5                 │
+└──────────────────────┘        └──────────────────────┘
+             <--- 1 second --->
+             6 requests in 1s!    (but each window sees <= 5)
+```
+
+If boundary bursts matter, use sliding window instead.
+
+Storage: `{ count: 5, windowStart: 1712678400000 }` -- **39 bytes per key**
 
 | | |
 |---|---|
@@ -61,7 +90,7 @@ Clients can burst at window boundaries (up to 2x limit in a short span). If that
 
 ### Sliding Window
 
-Blends current and previous window counts to smooth out the boundary burst problem. Uses the two-counter approximation: `floor(prevCount * weight + currCount)`.
+Blends current and previous window counts to eliminate the boundary burst. Uses the two-counter approximation: `floor(prevCount * weight + currCount)`.
 
 ```typescript
 rateLimiter({
@@ -69,9 +98,48 @@ rateLimiter({
 });
 ```
 
+```
+limit = 10
+
+Previous Window          Current Window
+┌──────────────┐        ┌──────────────┐
+│  count = 8   │        │  count = 3   │
+└──────────────┘        └──────────────┘
+                             ^
+                             |  we are 40% into this window
+                             |  weight = 1 - 0.4 = 0.6
+
+estimated = floor(prev x weight + current)
+          = floor(8    x 0.6    + 3)
+          = floor(7.8)
+          = 7
+
+7 < 10 -> ALLOWED (3 remaining)
+```
+
+The weight slides linearly as time progresses through the current window:
+
+```
+weight
+ 1.0 |\.
+     |  \.
+ 0.5 |----\.----
+     |      \.
+ 0.0 |--------\.
+     +----------+---> time
+     start     end
+     of window
+
+At start: weight=1.0, previous window counts fully
+At mid:   weight=0.5, previous window counts half
+At end:   weight=0.0, previous window ignored
+```
+
 Same O(1) memory as fixed window. No timestamp arrays.
 
 > **Note:** Sliding window uses an approximate calculation. It blends two fixed window counters with linear interpolation instead of tracking exact timestamps. This is a deliberate tradeoff for O(1) performance. The estimation is slightly conservative and good enough for production use at Cloudflare and Nginx, but it is not exact. Keep this in mind if your use case requires precise counting.
+
+Storage: `{ previousCount: 8, currentCount: 3, windowStart: ... }` -- **64 bytes per key**
 
 | | |
 |---|---|
@@ -89,15 +157,70 @@ rateLimiter({
 });
 ```
 
-This is not a traditional token bucket. It uses GCRA (Generic Cell Rate Algorithm). Instead of storing token counts and running refill loops, it stores a single number (TAT) and asks one question: "is it too early for this request?" Time passing is the refill. No counters to sync, no drift, no read-modify-write races.
+This is not a traditional token bucket. It uses GCRA (Generic Cell Rate Algorithm). Instead of storing token counts and running refill loops, it stores a single number -- **TAT** (Theoretical Arrival Time) -- and asks one question: "is it too early for this request?" Time passing *is* the refill.
+
+```
+capacity = 5,  refillRate = 1/sec
+emissionInterval = 1000ms          (time between tokens)
+burstOffset      = 5000ms          (capacity x emissionInterval)
+
+Each request pushes TAT forward. If "too early", denied:
+
+t=0ms   Req #1  newTat=1000   allowAt=-4000   0>-4000  ALLOWED  tat=1000
+t=0ms   Req #2  newTat=2000   allowAt=-3000   0>-3000  ALLOWED  tat=2000
+t=0ms   Req #3  newTat=3000   allowAt=-2000   0>-2000  ALLOWED  tat=3000
+t=0ms   Req #4  newTat=4000   allowAt=-1000   0>-1000  ALLOWED  tat=4000
+t=0ms   Req #5  newTat=5000   allowAt=0       0>=0     ALLOWED  tat=5000
+t=0ms   Req #6  newTat=6000   allowAt=1000    0<1000   DENIED   retryAfter=1s
+t=1000  Req #7  newTat=6000   allowAt=1000    1000>=1000 ALLOWED  (1 token refilled)
+```
+
+The "refill" is just time moving forward -- no counters, no loops:
+
+```
+tokens available over time (capacity=5, refill=1/sec)
+
+ 5 |* * * * *                              *---------
+   |          \                           /
+ 4 |           \                         /
+   |            \                       /
+ 3 |             \                     /
+   |              \                   /
+ 2 |               \                 /
+   |                \               /
+ 1 |                 \             /
+   |                  \           /
+ 0 |                   *---------*
+   +---+---+---+---+---+---+---+---+---+---+---> time(s)
+       0   1   2   3   4   5   6   7   8   9
+
+   <-- 5 reqs burst -->  <-- denied -->  <-- refilling -->
+       at t=0              retryAfter      1 token/sec
+```
 
 A traditional token bucket stores `{tokens, lastRefillMs}`, needs a refill calculation on every request, and requires locking in Redis. GCRA stores one number and does one comparison. That is why Stripe, Cloudflare, Kong, and Shopify all use it.
+
+Storage: `{ tat: 1712678405000 }` -- **21 bytes per key**
 
 | | |
 |---|---|
 | Time | O(1) |
 | Space | O(1) per key (21 bytes) |
 | Redis | 1 `EVAL` (minimal Lua: read a number, compare, write a number) |
+
+### Algorithm Comparison
+
+```
+               Fixed Window     Sliding Window    Token Bucket (GCRA)
+             +----------------+------------------+--------------------+
+ Time        |     O(1)       |      O(1)        |       O(1)         |
+ Space/key   |   39 bytes     |    64 bytes      |     21 bytes       |
+ Redis cmds  |   1 INCR       |  INCR + GET      |    1 EVAL (Lua)    |
+ Burst       | 2x at edges    |  Smoothed        |  Controlled        |
+ Precision   |   Exact        |  Approximate     |     Exact          |
+ Best for    |  Simplicity    |  Smooth limiting |  APIs / billing    |
+             +----------------+------------------+--------------------+
+```
 
 ## Storage
 
