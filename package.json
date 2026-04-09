@@ -1,0 +1,22 @@
+{
+  "name": "elysia-advanced-rate-limiter",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "bench": "bun run benchmark/run.ts",
+    "bench:throughput": "bun run benchmark/run.ts throughput",
+    "bench:race": "bun run benchmark/run.ts race",
+    "bench:burst": "bun run benchmark/run.ts burst",
+    "bench:memory": "bun run benchmark/run.ts memory"
+  },
+  "dependencies": {
+    "elysia": "^1.2.25",
+    "ioredis": "^5.10.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.9",
+    "typescript": "^5.8.3"
+  }
+}
