@@ -2,9 +2,50 @@
   "name": "elysia-advanced-rate-limiter",
   "version": "0.1.0",
   "type": "module",
+  "description": "A fast, opinionated rate limiter for Elysia. Fixed window, sliding window, and token bucket (GCRA). In-memory or Redis.",
+  "author": "mrtcmn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrtcmn/elysia-advanced-rate-limitter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mrtcmn/elysia-advanced-rate-limitter/issues"
+  },
+  "homepage": "https://github.com/mrtcmn/elysia-advanced-rate-limitter#readme",
+  "keywords": [
+    "elysia",
+    "rate-limiter",
+    "rate-limiting",
+    "token-bucket",
+    "gcra",
+    "sliding-window",
+    "fixed-window",
+    "redis",
+    "bun",
+    "middleware"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "bun run build:clean && bun run build:tsc",
+    "build:clean": "rm -rf dist",
+    "build:tsc": "tsc --project tsconfig.build.json",
     "test": "bun test",
     "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
     "bench": "bun run benchmark/run.ts",
     "bench:throughput": "bun run benchmark/run.ts throughput",
     "bench:race": "bun run benchmark/run.ts race",
@@ -12,11 +53,19 @@
     "bench:memory": "bun run benchmark/run.ts memory"
   },
   "dependencies": {
-    "elysia": "^1.2.25",
-    "ioredis": "^5.10.1"
+    "elysia": "^1.2.25"
+  },
+  "peerDependencies": {
+    "ioredis": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ioredis": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/bun": "^1.2.9",
+    "ioredis": "^5.10.1",
     "typescript": "^5.8.3"
   }
 }

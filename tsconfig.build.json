@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "index.ts",
+    "core/**/*.ts",
+    "plugin/**/*.ts",
+    "resolvers/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "benchmark"
+  ]
+}
