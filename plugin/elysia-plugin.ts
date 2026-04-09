@@ -31,6 +31,28 @@ const DEFAULT_CONFIG: Required<
   prefix: "rl:",
 };
 
+function validateAlgorithmConfig(config: AlgorithmConfig): void {
+  switch (config.algorithm) {
+    case "token-bucket":
+      if (!Number.isFinite(config.capacity) || config.capacity <= 0) {
+        throw new Error(`rate-limiter: token-bucket capacity must be a positive number, got ${config.capacity}`);
+      }
+      if (!Number.isFinite(config.refillRate) || config.refillRate <= 0) {
+        throw new Error(`rate-limiter: token-bucket refillRate must be a positive number, got ${config.refillRate}`);
+      }
+      break;
+    case "fixed-window":
+    case "sliding-window":
+      if (!Number.isFinite(config.limit) || config.limit <= 0 || !Number.isInteger(config.limit)) {
+        throw new Error(`rate-limiter: ${config.algorithm} limit must be a positive integer, got ${config.limit}`);
+      }
+      if (!Number.isFinite(config.windowMs) || config.windowMs <= 0) {
+        throw new Error(`rate-limiter: ${config.algorithm} windowMs must be a positive number, got ${config.windowMs}`);
+      }
+      break;
+  }
+}
+
 function computeTtlMs(config: AlgorithmConfig): number {
   switch (config.algorithm) {
     case "token-bucket":
@@ -45,7 +67,8 @@ function computeTtlMs(config: AlgorithmConfig): number {
 // biome-ignore lint/suspicious/noExplicitAny: Elysia plugin return type is complex and version-dependent
 export function rateLimiter(options: RateLimiterOptions = {}): any {
   const algorithmConfig = options.algorithm ?? DEFAULT_CONFIG.algorithm;
-  const store = options.store ?? new MemoryStore();
+  validateAlgorithmConfig(algorithmConfig);
+  const store = options.store ?? new MemoryStore({ maxKeys: 100_000 });
   const keyResolve = options.keyResolver ?? ipResolver();
   const errorResponse = options.errorResponse ?? DEFAULT_CONFIG.errorResponse;
   const skip = options.skip;

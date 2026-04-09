@@ -26,4 +26,5 @@ export { rateLimiter } from "./plugin/elysia-plugin";
 export { composeResolvers } from "./resolvers/compose";
 // Key resolvers
 export { ipResolver } from "./resolvers/ip-resolver";
+export type { IpResolverOptions } from "./resolvers/ip-resolver";
 export { userResolver } from "./resolvers/user-resolver";

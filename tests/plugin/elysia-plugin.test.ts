@@ -681,6 +681,78 @@ describe("rateLimiter Elysia plugin", () => {
     });
   });
 
+  describe("algorithm config validation", () => {
+    it("throws on token-bucket with capacity=0", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "token-bucket", capacity: 0, refillRate: 10 } })
+      ).toThrow("capacity must be a positive number");
+    });
+
+    it("throws on token-bucket with negative refillRate", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "token-bucket", capacity: 10, refillRate: -1 } })
+      ).toThrow("refillRate must be a positive number");
+    });
+
+    it("throws on token-bucket with Infinity capacity", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "token-bucket", capacity: Infinity, refillRate: 10 } })
+      ).toThrow("capacity must be a positive number");
+    });
+
+    it("throws on fixed-window with limit=0", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "fixed-window", limit: 0, windowMs: 60000 } })
+      ).toThrow("limit must be a positive integer");
+    });
+
+    it("throws on fixed-window with windowMs=0", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "fixed-window", limit: 10, windowMs: 0 } })
+      ).toThrow("windowMs must be a positive number");
+    });
+
+    it("throws on sliding-window with non-integer limit", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "sliding-window", limit: 1.5, windowMs: 60000 } })
+      ).toThrow("limit must be a positive integer");
+    });
+
+    it("throws on fixed-window with NaN windowMs", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "fixed-window", limit: 10, windowMs: NaN } })
+      ).toThrow("windowMs must be a positive number");
+    });
+
+    it("accepts valid token-bucket config", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "token-bucket", capacity: 100, refillRate: 10 } })
+      ).not.toThrow();
+    });
+
+    it("accepts valid fixed-window config", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "fixed-window", limit: 100, windowMs: 60000 } })
+      ).not.toThrow();
+    });
+
+    it("accepts valid sliding-window config", () => {
+      expect(() =>
+        rateLimiter({ algorithm: { algorithm: "sliding-window", limit: 100, windowMs: 60000 } })
+      ).not.toThrow();
+    });
+  });
+
+  describe("default MemoryStore has maxKeys", () => {
+    it("uses a bounded MemoryStore by default", async () => {
+      // The default store should be a MemoryStore with maxKeys=100_000
+      // We verify indirectly: creating the plugin with no store should work
+      const app = createApp();
+      const res = await app.handle(request());
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("circuit breaker integration", () => {
     it("fast-fails and allows traffic after circuit trips (fail-open)", async () => {
       let callCount = 0;

@@ -90,4 +90,50 @@ describe("ipResolver", () => {
       expect(typeof key).toBe("string");
     });
   });
+
+  describe("trustedProxyDepth", () => {
+    it("depth=1: takes rightmost (last) IP from x-forwarded-for", () => {
+      const r = ipResolver({ trustedProxyDepth: 1 });
+      const key = r(req({ "x-forwarded-for": "spoofed, 1.2.3.4" }));
+      expect(key).toBe("1.2.3.4");
+    });
+
+    it("depth=2: takes 2nd-from-right IP", () => {
+      const r = ipResolver({ trustedProxyDepth: 2 });
+      const key = r(req({ "x-forwarded-for": "client, proxy1, proxy2" }));
+      expect(key).toBe("proxy1");
+    });
+
+    it("depth=1 with single IP returns that IP", () => {
+      const r = ipResolver({ trustedProxyDepth: 1 });
+      const key = r(req({ "x-forwarded-for": "10.0.0.1" }));
+      expect(key).toBe("10.0.0.1");
+    });
+
+    it("depth exceeding IP count clamps to first IP", () => {
+      const r = ipResolver({ trustedProxyDepth: 5 });
+      const key = r(req({ "x-forwarded-for": "1.1.1.1, 2.2.2.2" }));
+      expect(key).toBe("1.1.1.1");
+    });
+
+    it("depth=0 behaves like legacy (takes first IP)", () => {
+      const r = ipResolver({ trustedProxyDepth: 0 });
+      const key = r(req({ "x-forwarded-for": "1.1.1.1, 2.2.2.2" }));
+      expect(key).toBe("1.1.1.1");
+    });
+
+    it("depth=1 prevents client-side spoofing", () => {
+      const r = ipResolver({ trustedProxyDepth: 1 });
+      // Attacker sends x-forwarded-for: fake-ip
+      // Proxy appends real IP → "fake-ip, real-ip"
+      const key = r(req({ "x-forwarded-for": "fake-ip, real-ip" }));
+      expect(key).toBe("real-ip");
+    });
+
+    it("falls back to cf-connecting-ip when xff is empty with depth", () => {
+      const r = ipResolver({ trustedProxyDepth: 1 });
+      const key = r(req({ "cf-connecting-ip": "203.0.113.1" }));
+      expect(key).toBe("203.0.113.1");
+    });
+  });
 });
