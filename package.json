@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrtcmn/elysia-advanced-rate-limitter.git"
+    "url": "git+https://github.com/mrtcmn/elysia-advanced-rate-limiter.git"
   },
   "bugs": {
-    "url": "https://github.com/mrtcmn/elysia-advanced-rate-limitter/issues"
+    "url": "https://github.com/mrtcmn/elysia-advanced-rate-limiter/issues"
   },
-  "homepage": "https://github.com/mrtcmn/elysia-advanced-rate-limitter#readme",
+  "homepage": "https://github.com/mrtcmn/elysia-advanced-rate-limiter#readme",
   "keywords": [
     "elysia",
     "rate-limiter",
