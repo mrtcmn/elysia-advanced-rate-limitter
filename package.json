@@ -15,15 +15,18 @@
   "homepage": "https://github.com/mrtcmn/elysia-advanced-rate-limitter#readme",
   "keywords": [
     "elysia",
+    "nestjs",
     "rate-limiter",
     "rate-limiting",
+    "throttler",
     "token-bucket",
     "gcra",
     "sliding-window",
     "fixed-window",
     "redis",
     "bun",
-    "middleware"
+    "middleware",
+    "decorator"
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./nestjs": {
+      "types": "./dist/nestjs/index.d.ts",
+      "import": "./dist/nestjs/index.js"
     }
   },
   "files": [
@@ -56,16 +63,32 @@
     "elysia": "^1.2.25"
   },
   "peerDependencies": {
-    "ioredis": ">=5.0.0"
+    "ioredis": ">=5.0.0",
+    "@nestjs/common": ">=10.0.0",
+    "@nestjs/core": ">=10.0.0",
+    "reflect-metadata": ">=0.1.0"
   },
   "peerDependenciesMeta": {
     "ioredis": {
       "optional": true
+    },
+    "@nestjs/common": {
+      "optional": true
+    },
+    "@nestjs/core": {
+      "optional": true
+    },
+    "reflect-metadata": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
     "@types/bun": "^1.2.9",
     "ioredis": "^5.10.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
     "typescript": "^5.8.3"
   }
 }
